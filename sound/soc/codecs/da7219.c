@@ -32,6 +32,7 @@
 #include "da7219.h"
 #include "da7219-aad.h"
 
+static struct snd_soc_jack da7219_jack;
 
 /*
  * TLVs and Enums
@@ -1210,6 +1211,32 @@ static int da7219_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	da7219->mclk_rate = freq;
 
 	mutex_unlock(&da7219->pll_lock);
+
+	/* Custom: set PLL_SRM mode. Reference: sound/soc/mediatek/mt8183/mt8183-da7219-max98357.c */
+    ret = snd_soc_dai_set_pll(codec_dai,
+                              0,
+                              DA7219_SYSCLK_PLL_SRM,
+                              da7219->mclk_rate,
+                              DA7219_PLL_FREQ_OUT_98304);
+	if (ret) {
+		dev_err(component->dev, "Failed to set PLL SRM mode: %d\n", ret);
+		return ret;
+	}
+
+	/* Custom: enable AAD. Reference: sound/soc/mediatek/mt8183/mt8183-da7219-max98357.c */
+	/* Enable Headset Jack detection */
+	ret = snd_soc_card_jack_new(component->card, "Headset Jack",
+							SND_JACK_HEADSET,
+							&da7219_jack,
+							NULL,0
+						);
+
+	if (ret) {
+		dev_err(component->dev, "New Headset Jack failed! \n");
+		return ret;
+	}
+
+	da7219_aad_jack_det(component, &da7219_jack);
 
 	return 0;
 }
